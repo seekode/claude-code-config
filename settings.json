@@ -1,0 +1,7 @@
+{
+  "statusLine": {
+    "type": "command",
+    "command": "bun C:\\Users\\Pc\\.claude\\statusline.js",
+    "padding": 0
+  }
+}
