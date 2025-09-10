@@ -6,6 +6,7 @@ const path = require("path");
 const colors = {
   reset: "\x1b[0m",
   bright: "\x1b[1m",
+  brightReset: "\x1b[0m\x1b[1m", // just for make code easier
   dim: "\x1b[2m",
   red: "\x1b[31m",
   green: "\x1b[32m",
@@ -15,6 +16,7 @@ const colors = {
   cyan: "\x1b[36m",
   white: "\x1b[37m",
   gray: "\x1b[90m",
+  black: "\x1b[30m",
 };
 
 // input data
@@ -38,118 +40,19 @@ process.stdin.on("end", () => {
  * Extract model name
  * @returns name
  */
-const modelName = () => jsonInput.model?.display_name || "Claude";
+const modelName = (icon, color) =>
+  `${colors.brightReset}${color}${icon} ${
+    jsonInput.model?.display_name || "Claude"
+  }`;
 
-/**
- * Get AI modification stats from the last prompt only with color coding
- * @returns string of added / removed lines with green for added, red for removed
- */
-/**
- * Clean old cache files asynchronously (older than 24h)
- */
-const cleanOldCacheFiles = () => {
-  const cacheDir = path.join(__dirname, "claude_cache");
-
-  // Run cleanup asynchronously to avoid blocking
-  setImmediate(() => {
-    try {
-      if (!fs.existsSync(cacheDir)) return;
-
-      const files = fs.readdirSync(cacheDir);
-      const now = Date.now();
-      const maxAge = 24 * 60 * 60 * 1000; // 24h in milliseconds
-
-      for (const file of files) {
-        if (file.startsWith("stats_") && file.endsWith(".json")) {
-          const filePath = path.join(cacheDir, file);
-          const stats = fs.statSync(filePath);
-
-          if (now - stats.mtime.getTime() > maxAge) {
-            fs.unlinkSync(filePath);
-          }
-        }
-      }
-    } catch (error) {
-      // Ignore cleanup errors silently
-    }
-  });
-};
-
-const getAIModificationStats = () => {
+const getAiModificationStats = () => {
   try {
     const cost = jsonInput.cost;
     if (!cost) return "+0 -0";
 
-    const sessionId = jsonInput.session_id || "default";
-    const cacheDir = path.join(__dirname, "claude_cache");
-    const cacheFile = path.join(cacheDir, `stats_${sessionId}.json`);
-
-    // Ensure cache directory exists
-    if (!fs.existsSync(cacheDir)) {
-      fs.mkdirSync(cacheDir, { recursive: true });
-    }
-
-    // Clean old files (async, non-blocking)
-    cleanOldCacheFiles();
-
-    let previousStats = {
-      added: 0,
-      removed: 0,
-      lastDisplay: { added: 0, removed: 0 },
-    };
-
-    // Read previous stats if exists
-    try {
-      if (fs.existsSync(cacheFile)) {
-        previousStats = JSON.parse(fs.readFileSync(cacheFile, "utf8"));
-      }
-    } catch (error) {
-      // Ignore cache read errors
-    }
-
-    const currentAdded = cost.total_lines_added || 0;
-    const currentRemoved = cost.total_lines_removed || 0;
-
-    const deltaAdded =
-      currentAdded == previousStats.added
-        ? previousStats.lastDisplay.added
-        : currentAdded - previousStats.added;
-    const deltaRemoved =
-      currentRemoved == previousStats.removed
-        ? previousStats.lastDisplay.removed
-        : currentRemoved - previousStats.removed;
-
-    // Update cache
-    try {
-      fs.writeFileSync(
-        cacheFile,
-        JSON.stringify({
-          added: currentAdded,
-          removed: currentRemoved,
-          lastDisplay: {
-            added: deltaAdded,
-            removed: deltaRemoved,
-          },
-        })
-      );
-    } catch (error) {
-      // Ignore cache write errors
-    }
-
-    return `${colors.green}+${deltaAdded}${colors.reset} ${colors.red}-${deltaRemoved}${colors.reset}`;
+    return `${colors.brightReset}(${colors.green}+${jsonInput.cost.total_lines_added}${colors.reset} ${colors.red}-${jsonInput.cost.total_lines_removed}${colors.reset}${colors.bright})`;
   } catch (error) {
-    return `${colors.green}+0${colors.reset} ${colors.red}-0${colors.reset}`;
-  }
-};
-
-const getTotalAiModificationStats = () => {
-  try {
-    const cost = jsonInput.cost;
-    if (!cost) return "+0 -0";
-
-    return `${colors.green}+${jsonInput.cost.total_lines_added}${colors.reset} ${colors.red}-${jsonInput.cost.total_lines_removed}${colors.reset}`;
-  } catch (error) {
-    return `${colors.green}+0${colors.reset} ${colors.red}-0${colors.reset}`;
+    return `${colors.brightReset}(${colors.green}+0${colors.reset} ${colors.red}-0${colors.reset}${colors.bright})`;
   }
 };
 
@@ -157,15 +60,17 @@ const getTotalAiModificationStats = () => {
  * Get output style from jsonInput
  * @returns output style name
  */
-const getOutputStyle = () => {
+const getOutputStyle = (icon, color) => {
   try {
     const style = jsonInput.output_style;
     if (typeof style === "object" && style !== null) {
-      return style.name || style.display_name || "default";
+      return `${colors.brightReset}${color}${icon} ${
+        style.name || style.display_name || "default"
+      }`;
     }
-    return style || "default";
+    return `${colors.brightReset}${color}${icon} ${style || "default"}`;
   } catch (error) {
-    return "default";
+    return `${colors.brightReset}${color}${icon} default`;
   }
 };
 
@@ -173,7 +78,7 @@ const getOutputStyle = () => {
  * Get session time in readable format
  * @returns formatted session time
  */
-const getSessionTime = () => {
+const getSessionTime = (icon, color) => {
   try {
     const cost = jsonInput.cost;
     if (!cost || !cost.total_duration_ms) return "0m";
@@ -185,36 +90,37 @@ const getSessionTime = () => {
     );
 
     if (hours > 0) {
-      return `${hours}h${minutes}m`;
+      return `${colors.brightReset}${color}${icon} ${hours}h${minutes}m`;
     } else {
-      return `${minutes}m`;
+      return `${colors.brightReset}${color}${icon} ${minutes}m`;
     }
   } catch (error) {
-    return "0m";
+    return `${colors.brightReset}${color}${icon} 0m`;
   }
 };
-
 
 /**
  * Extract project name
  * @returns name
  */
-const projectName = () => {
+const projectName = (icon, color) => {
   const dir = jsonInput.workspace?.current_dir || process.cwd();
-  return path.basename(dir) || "Unknown";
+  return `${colors.brightReset}${color}${icon} ${
+    path.basename(dir) || "Unknown"
+  }`;
 };
 
 /**
  * Get git context (branch and stats) in a single read
  * @returns object with branch and stats
  */
-const getGitContext = () => {
+const loadGitContext = () => {
   const dir = jsonInput.workspace?.current_dir || process.cwd();
   try {
     process.chdir(dir);
     if (!fs.existsSync(".git")) {
       return {
-        branch: "no-git",
+        branch: `no-git`,
         stats: `${colors.green}+0${colors.reset} ${colors.red}-0${colors.reset}`,
       };
     }
@@ -299,9 +205,25 @@ const getGitContext = () => {
  */
 const gitContext = () => {
   if (!gitContextCache) {
-    gitContextCache = getGitContext();
+    gitContextCache = loadGitContext();
   }
   return gitContextCache;
+};
+
+/**
+ * get colorized git branch
+ * @returns stylized git branch name
+ */
+const gitBranch = (icon, color) => {
+  return `${colors.brightReset}${color}${icon} ${gitContext().branch}`;
+};
+
+/**
+ * get colorized git stats
+ * @returns stylized git stats
+ */
+const gitStats = () => {
+  return `${colors.brightReset}(${colors.green}+0${colors.reset} ${colors.red}-0${colors.reset})`;
 };
 
 /**
@@ -309,15 +231,13 @@ const gitContext = () => {
  */
 function generateIALine() {
   try {
-    return `${colors.cyan}🤖 ${colors.bright}${modelName()}${
-      colors.reset
-    } (${getAIModificationStats()}) ${colors.gray}|${colors.reset} ${
-      colors.magenta
-    }🎨 ${getOutputStyle()}${colors.reset} ${colors.gray}|${colors.reset} ${
-      colors.yellow
-    }⌚ ${getSessionTime()}${
-      colors.reset
-    } | Total : ${getTotalAiModificationStats()}`;
+    const part = [];
+
+    part.push(`${modelName("🤖", colors.cyan)} ${getAiModificationStats()}`);
+    part.push(getOutputStyle("🎨", colors.magenta));
+    part.push(getSessionTime("⌚", colors.yellow));
+
+    return part.join(`${colors.reset}${colors.gray} | `);
   } catch (error) {
     return `${colors.cyan}🤖 ${colors.bright}Claude${colors.reset} (${colors.green}+0${colors.reset} ${colors.red}-0${colors.reset}) ${colors.gray}|${colors.reset} ${colors.magenta}🎨 default${colors.reset} ${colors.gray}|${colors.reset} ${colors.yellow}⏱️ 0m${colors.reset}`;
   }
@@ -328,12 +248,13 @@ function generateIALine() {
  */
 function generateProjectLine() {
   try {
-    return `${colors.blue}📁 ${colors.bright}${projectName()}${colors.reset} ${
-      colors.gray
-    }|${colors.reset} ${colors.green}🌿 ${gitContext().branch}${
-      colors.reset
-    } (${gitContext().stats})`;
+    const part = [];
+
+    part.push(`${projectName("📁", colors.blue)}`);
+    part.push(`${gitBranch("🌿", colors.green)} ${gitStats()}`);
+
+    return part.join(`${colors.reset}${colors.gray} | `);
   } catch (error) {
-    return `${colors.blue}📁 ${colors.bright}Unknown${colors.reset} ${colors.gray}|${colors.reset} ${colors.green}🌿 unknown${colors.reset} (${colors.green}+0${colors.reset} ${colors.red}-0${colors.reset})`;
+    return `${colors.blue}📁 ${colors.bright}Unknown${colors.reset} ${colors.gray}|${colors.reset} ${colors.green} unknown${colors.reset} (${colors.green}+0${colors.reset} ${colors.red}-0${colors.reset})`;
   }
 }
